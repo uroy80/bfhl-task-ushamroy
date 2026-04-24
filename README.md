@@ -36,10 +36,10 @@
 </p>
 
 <p align="center">
-  <a href="https://bfhl.ushamroy.com">
-    <img src="https://img.shields.io/badge/Live%20Product-bfhl.ushamroy.com-4CAF50?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Live Product"/>
+  <a href="https://bfhl-task.ushamroy.com">
+    <img src="https://img.shields.io/badge/Live%20Product-bfhl-task.ushamroy.com-4CAF50?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Live Product"/>
   </a>
-  <a href="https://bfhl.ushamroy.com/bfhl">
+  <a href="https://bfhl-task.ushamroy.com/bfhl">
     <img src="https://img.shields.io/badge/API%20Endpoint-POST%20%2Fbfhl-0A2849?style=for-the-badge&logo=swagger&logoColor=white" alt="API Endpoint"/>
   </a>
   <a href="https://github.com/uroy80/bfhl-task-ushamroy">
@@ -59,18 +59,18 @@
 | **Date of Birth** | 04 / 08 / 2005 |
 | **College** | SRM Institute of Science and Technology |
 | **Branch** | CSE / Computing Technologies |
-| **Frontend URL** | https://bfhl.ushamroy.com |
-| **Backend API Base** | https://bfhl.ushamroy.com |
-| **API Endpoint** | `POST https://bfhl.ushamroy.com/bfhl` |
+| **Frontend URL** | https://bfhl-task.ushamroy.com |
+| **Backend API Base** | https://bfhl-task.ushamroy.com |
+| **API Endpoint** | `POST https://bfhl-task.ushamroy.com/bfhl` |
 | **GitHub Repo** | https://github.com/uroy80/bfhl-task-ushamroy |
 
 ## Live Endpoints
 
 | Resource | URL | Notes |
 |---|---|---|
-| Frontend | https://bfhl.ushamroy.com | Glassmorphism UI with tree visualization |
-| API Health | `GET https://bfhl.ushamroy.com/bfhl` | Returns operational metadata |
-| API | `POST https://bfhl.ushamroy.com/bfhl` | `Content-Type: application/json` — body `{ "data": [...] }` |
+| Frontend | https://bfhl-task.ushamroy.com | Glassmorphism UI with tree visualization |
+| API Health | `GET https://bfhl-task.ushamroy.com/bfhl` | Returns operational metadata |
+| API | `POST https://bfhl-task.ushamroy.com/bfhl` | `Content-Type: application/json` — body `{ "data": [...] }` |
 
 ## The Challenge
 
@@ -91,7 +91,7 @@ Key evaluator expectations:
 
 ```http
 POST /bfhl HTTP/1.1
-Host: bfhl.ushamroy.com
+Host: bfhl-task.ushamroy.com
 Content-Type: application/json
 
 {
@@ -257,7 +257,7 @@ server {
     listen 443 ssl;
     listen [::]:443 ssl;
     http2 on;
-    server_name bfhl.ushamroy.com;
+    server_name bfhl-task.ushamroy.com;
     ssl_certificate     /etc/ssl/certs/ushamroy.com.crt;
     ssl_certificate_key /etc/ssl/private/ushamroy.com.key;
     ssl_protocols TLSv1.2 TLSv1.3;
@@ -306,7 +306,7 @@ node scripts/smoke.mjs       # run processor tests
 ## Example — curl
 
 ```bash
-curl -sX POST https://bfhl.ushamroy.com/bfhl \
+curl -sX POST https://bfhl-task.ushamroy.com/bfhl \
   -H 'Content-Type: application/json' \
   -d '{
     "data": [
