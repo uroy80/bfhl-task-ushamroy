@@ -399,7 +399,21 @@ function CycleGraphView({ root }) {
   );
 }
 
-function HierarchyCard({ h }) {
+function ExpandIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+      <path
+        d="M3 5.5V3h2.5M11 5.5V3H8.5M3 8.5V11h2.5M11 8.5V11H8.5"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function HierarchyCard({ h, onExpand }) {
   const [view, setView] = useState('graph');
 
   if (h.has_cycle) {
@@ -409,7 +423,18 @@ function HierarchyCard({ h }) {
           <span className="root-label">
             Root <strong>{h.root}</strong>
           </span>
-          <span className="badge badge-cycle">cycle detected</span>
+          <div className="hier-header-right">
+            <button
+              type="button"
+              className="icon-btn"
+              onClick={onExpand}
+              aria-label="Expand graph to fullscreen"
+              title="Expand"
+            >
+              <ExpandIcon />
+            </button>
+            <span className="badge badge-cycle">cycle detected</span>
+          </div>
         </div>
         <CycleGraphView root={h.root} />
         <div className="cycle-note">
@@ -447,6 +472,15 @@ function HierarchyCard({ h }) {
               Tree
             </button>
           </div>
+          <button
+            type="button"
+            className="icon-btn"
+            onClick={onExpand}
+            aria-label="Expand graph to fullscreen"
+            title="Expand"
+          >
+            <ExpandIcon />
+          </button>
           <span className="badge badge-depth">depth {h.depth}</span>
         </div>
       </div>
@@ -461,12 +495,77 @@ function HierarchyCard({ h }) {
   );
 }
 
+function FullGraphModal({ h, onClose }) {
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [onClose]);
+
+  if (!h) return null;
+
+  const rootKey = h.has_cycle ? null : Object.keys(h.tree)[0];
+
+  return (
+    <div
+      className="fg-backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Full graph rooted at ${h.root}`}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div className="fg-modal">
+        <div className="fg-head">
+          <div className="fg-title">
+            <span className="root-label">
+              Root <strong>{h.root}</strong>
+            </span>
+            {h.has_cycle ? (
+              <span className="badge badge-cycle">cycle detected</span>
+            ) : (
+              <span className="badge badge-depth">depth {h.depth}</span>
+            )}
+          </div>
+          <button
+            type="button"
+            className="fg-close"
+            onClick={onClose}
+            aria-label="Close expanded graph"
+          >
+            ✕
+          </button>
+        </div>
+        <div className="fg-body">
+          {h.has_cycle ? (
+            <CycleGraphView root={h.root} />
+          ) : (
+            <GraphView rootName={rootKey} subtree={h.tree[rootKey]} />
+          )}
+        </div>
+        <div className="fg-foot">
+          <span className="field-hint">Press Esc or click outside to close</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Page() {
   const [input, setInput] = useState(EXAMPLE);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [result, setResult] = useState(null);
   const [copied, setCopied] = useState(false);
+  const [expanded, setExpanded] = useState(null);
   const abortRef = useRef(null);
   const [isMac, setIsMac] = useState(false);
 
@@ -671,7 +770,11 @@ export default function Page() {
                 </div>
                 <div className="hierarchies">
                   {result.hierarchies.map((h, i) => (
-                    <HierarchyCard key={`${h.root}-${i}`} h={h} />
+                    <HierarchyCard
+                      key={`${h.root}-${i}`}
+                      h={h}
+                      onExpand={() => setExpanded(h)}
+                    />
                   ))}
                 </div>
               </>
@@ -735,6 +838,8 @@ export default function Page() {
           <span>Built with Next.js</span>
         </footer>
       </main>
+
+      {expanded && <FullGraphModal h={expanded} onClose={() => setExpanded(null)} />}
     </>
   );
 }
