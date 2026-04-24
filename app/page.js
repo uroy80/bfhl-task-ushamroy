@@ -2,22 +2,15 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-const EXAMPLE = `A->B
-A->C
-B->D
-C->E
-E->F
-X->Y
-Y->Z
-Z->X
-P->Q
-Q->R
-G->H
-G->H
-G->I
-hello
-1->2
-A->`;
+const EXAMPLE = `{
+  "data": [
+    "A->B", "A->C", "B->D", "C->E", "E->F",
+    "X->Y", "Y->Z", "Z->X",
+    "P->Q", "Q->R",
+    "G->H", "G->H", "G->I",
+    "hello", "1->2", "A->"
+  ]
+}`;
 
 const REQUEST_TIMEOUT_MS = 15000;
 
@@ -25,10 +18,11 @@ function parseInput(text) {
   const trimmed = text.trim();
   if (!trimmed) return [];
 
-  if (trimmed.startsWith('[')) {
+  if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
     try {
       const parsed = JSON.parse(trimmed);
       if (Array.isArray(parsed)) return parsed;
+      if (parsed && Array.isArray(parsed.data)) return parsed.data;
     } catch {
       // fall through to line parsing
     }
@@ -204,9 +198,9 @@ function layoutTree(rootName, subtree) {
   const nodes = [];
   const edges = [];
   let leafIndex = 0;
-  const HGAP = 64;
-  const VGAP = 64;
-  const PADDING = 28;
+  const HGAP = 78;
+  const VGAP = 84;
+  const PADDING = 42;
 
   const walk = (name, tree, depth, parentIdx) => {
     const selfIdx = nodes.length;
@@ -248,7 +242,14 @@ function GraphView({ rootName, subtree }) {
     () => layoutTree(rootName, subtree),
     [rootName, subtree],
   );
-  const R = 18;
+  const R = 22;
+  const RIM = 9;
+  const hasChild = useMemo(() => new Set(edges.map(([f]) => f)), [edges]);
+  const safeId = rootName.replace(/[^A-Za-z0-9_-]/g, '_');
+  const gradId = `grad-${safeId}`;
+  const leafGradId = `leafgrad-${safeId}`;
+  const shadowId = `shadow-${safeId}`;
+
   return (
     <div className="graph-wrap">
       <svg
@@ -259,88 +260,138 @@ function GraphView({ rootName, subtree }) {
         aria-label={`Hierarchy graph rooted at ${rootName}`}
       >
         <defs>
-          <linearGradient id={`nd-${rootName}`} x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stopColor="#2e86ff" />
+          <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#4c9bff" />
+            <stop offset="55%" stopColor="#1573fe" />
             <stop offset="100%" stopColor="#0b4bb4" />
           </linearGradient>
-          <filter id={`glow-${rootName}`} x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur stdDeviation="2" result="b" />
-            <feMerge>
-              <feMergeNode in="b" />
-              <feMergeNode in="SourceGraphic" />
-            </feMerge>
+          <linearGradient id={leafGradId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#ffffff" />
+            <stop offset="100%" stopColor="#eef4ff" />
+          </linearGradient>
+          <filter id={shadowId} x="-50%" y="-50%" width="200%" height="200%">
+            <feDropShadow dx="0" dy="3" stdDeviation="4" floodColor="#1573fe" floodOpacity="0.28" />
           </filter>
         </defs>
-        {edges.map(([from, to], i) => (
-          <line
-            key={i}
-            x1={nodes[from].x}
-            y1={nodes[from].y}
-            x2={nodes[to].x}
-            y2={nodes[to].y}
-            stroke="rgba(21, 115, 254, 0.35)"
-            strokeWidth="1.6"
-            strokeLinecap="round"
-          />
-        ))}
-        {nodes.map((n, i) => (
-          <g key={i} filter={`url(#glow-${rootName})`}>
-            <circle
-              cx={n.x}
-              cy={n.y}
-              r={R}
-              fill={`url(#nd-${rootName})`}
-              stroke="rgba(255,255,255,0.7)"
-              strokeWidth="1.5"
+
+        {edges.map(([from, to], i) => {
+          const f = nodes[from];
+          const t = nodes[to];
+          const midY = f.y + (t.y - f.y) / 2;
+          const d = `M ${f.x} ${f.y} C ${f.x} ${midY}, ${t.x} ${midY}, ${t.x} ${t.y}`;
+          return (
+            <path
+              key={i}
+              d={d}
+              stroke="rgba(21, 115, 254, 0.45)"
+              strokeWidth="1.8"
+              fill="none"
+              strokeLinecap="round"
             />
-            <text
-              x={n.x}
-              y={n.y}
-              textAnchor="middle"
-              dominantBaseline="central"
-              fontSize="14"
-              fontFamily="ui-monospace, SFMono-Regular, Menlo, Monaco, monospace"
-              fontWeight="700"
-              fill="#ffffff"
-            >
-              {n.name}
-            </text>
-          </g>
-        ))}
+          );
+        })}
+
+        {nodes.map((n, i) => {
+          const isRoot = i === 0;
+          const isLeaf = !hasChild.has(i);
+          return (
+            <g key={i} className={`gnode${isRoot ? ' is-root' : ''}${isLeaf ? ' is-leaf' : ''}`}>
+              {isRoot && (
+                <circle
+                  cx={n.x}
+                  cy={n.y}
+                  r={R + RIM}
+                  fill="none"
+                  stroke="rgba(21,115,254,0.3)"
+                  strokeWidth="1.4"
+                  strokeDasharray="3 4"
+                />
+              )}
+              <circle
+                cx={n.x}
+                cy={n.y}
+                r={R}
+                fill={isLeaf ? `url(#${leafGradId})` : `url(#${gradId})`}
+                stroke={isLeaf ? 'rgba(21,115,254,0.55)' : 'rgba(255,255,255,0.85)'}
+                strokeWidth="2"
+                filter={`url(#${shadowId})`}
+              />
+              <text
+                x={n.x}
+                y={n.y}
+                textAnchor="middle"
+                dominantBaseline="central"
+                fontSize="15"
+                fontFamily="ui-monospace, SFMono-Regular, Menlo, Monaco, monospace"
+                fontWeight="700"
+                fill={isLeaf ? '#0b4bb4' : '#ffffff'}
+                style={{ userSelect: 'none' }}
+              >
+                {n.name}
+              </text>
+            </g>
+          );
+        })}
       </svg>
     </div>
   );
 }
 
 function CycleGraphView({ root }) {
-  const size = 120;
+  const size = 160;
   const cx = size / 2;
   const cy = size / 2;
-  const r = 34;
+  const r = 48;
   return (
     <div className="graph-wrap cycle">
       <svg
-        className="graph"
+        className="graph cycle-graph"
         viewBox={`0 0 ${size} ${size}`}
         preserveAspectRatio="xMidYMid meet"
         role="img"
         aria-label={`Cyclic component with root ${root}`}
       >
         <defs>
-          <marker id="cycle-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <marker id={`cy-arrow-${root}`} viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto">
             <path d="M0,0 L10,5 L0,10 z" fill="#b16a00" />
           </marker>
+          <linearGradient id={`cy-grad-${root}`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#f5a524" />
+            <stop offset="100%" stopColor="#b16a00" />
+          </linearGradient>
+          <filter id={`cy-shadow-${root}`} x="-50%" y="-50%" width="200%" height="200%">
+            <feDropShadow dx="0" dy="3" stdDeviation="4" floodColor="#b16a00" floodOpacity="0.35" />
+          </filter>
         </defs>
-        <circle cx={cx} cy={cy} r={r} fill="none" stroke="rgba(245, 165, 36, 0.55)" strokeWidth="1.6" strokeDasharray="4 4" />
+        <circle cx={cx} cy={cy} r={r} fill="none" stroke="rgba(245, 165, 36, 0.35)" strokeWidth="1.6" strokeDasharray="3 5" />
         <path
-          d={`M ${cx + r} ${cy} A ${r} ${r} 0 1 1 ${cx + r - 0.1} ${cy - 0.1}`}
+          d={`M ${cx} ${cy - r} A ${r} ${r} 0 1 1 ${cx - 0.5} ${cy - r}`}
           fill="none"
-          stroke="rgba(245, 165, 36, 0.85)"
-          strokeWidth="1.8"
-          markerEnd="url(#cycle-arrow)"
+          stroke="rgba(245, 165, 36, 0.9)"
+          strokeWidth="2"
+          strokeLinecap="round"
+          markerEnd={`url(#cy-arrow-${root})`}
         />
-        <circle cx={cx} cy={cy} r={18} fill="#b16a00" stroke="rgba(255,255,255,0.7)" strokeWidth="1.5" />
-        <text x={cx} y={cy} textAnchor="middle" dominantBaseline="central" fontSize="14" fontFamily="ui-monospace, monospace" fontWeight="700" fill="#fff">
+        <circle
+          cx={cx}
+          cy={cy}
+          r={22}
+          fill={`url(#cy-grad-${root})`}
+          stroke="rgba(255,255,255,0.85)"
+          strokeWidth="2"
+          filter={`url(#cy-shadow-${root})`}
+        />
+        <text
+          x={cx}
+          y={cy}
+          textAnchor="middle"
+          dominantBaseline="central"
+          fontSize="15"
+          fontFamily="ui-monospace, monospace"
+          fontWeight="700"
+          fill="#fff"
+          style={{ userSelect: 'none' }}
+        >
           {root}
         </text>
       </svg>
