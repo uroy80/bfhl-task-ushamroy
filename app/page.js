@@ -40,6 +40,98 @@ function parseInput(text) {
     .filter((line) => line.length > 0);
 }
 
+function BgGraph() {
+  const canvasRef = useRef(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const prefersReduced =
+      typeof window !== 'undefined' &&
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    let width = 0;
+    let height = 0;
+
+    const resize = () => {
+      width = canvas.clientWidth;
+      height = canvas.clientHeight;
+      canvas.width = Math.floor(width * dpr);
+      canvas.height = Math.floor(height * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    };
+    resize();
+    window.addEventListener('resize', resize);
+
+    const count = Math.max(36, Math.min(72, Math.floor((width * height) / 24000)));
+    const speed = prefersReduced ? 0 : 0.22;
+    const particles = Array.from({ length: count }, () => ({
+      x: Math.random() * width,
+      y: Math.random() * height,
+      vx: (Math.random() - 0.5) * speed,
+      vy: (Math.random() - 0.5) * speed,
+      r: 1.2 + Math.random() * 1.8,
+    }));
+
+    const MAX_DIST = 150;
+    let raf;
+
+    const tick = () => {
+      ctx.clearRect(0, 0, width, height);
+
+      for (const p of particles) {
+        p.x += p.vx;
+        p.y += p.vy;
+        if (p.x < -20) p.x = width + 20;
+        if (p.x > width + 20) p.x = -20;
+        if (p.y < -20) p.y = height + 20;
+        if (p.y > height + 20) p.y = -20;
+      }
+
+      ctx.lineWidth = 1;
+      for (let i = 0; i < particles.length; i++) {
+        for (let j = i + 1; j < particles.length; j++) {
+          const a = particles[i];
+          const b = particles[j];
+          const dx = a.x - b.x;
+          const dy = a.y - b.y;
+          const d2 = dx * dx + dy * dy;
+          if (d2 < MAX_DIST * MAX_DIST) {
+            const alpha = (1 - Math.sqrt(d2) / MAX_DIST) * 0.28;
+            ctx.strokeStyle = `rgba(21, 115, 254, ${alpha})`;
+            ctx.beginPath();
+            ctx.moveTo(a.x, a.y);
+            ctx.lineTo(b.x, b.y);
+            ctx.stroke();
+          }
+        }
+      }
+
+      for (const p of particles) {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(21, 115, 254, 0.55)';
+        ctx.fill();
+      }
+
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener('resize', resize);
+    };
+  }, []);
+
+  return <canvas ref={canvasRef} className="bg-graph" aria-hidden="true" />;
+}
+
 function BrandLogo({ className }) {
   return (
     <svg
@@ -108,7 +200,157 @@ function TreeNode({ name, subtree }) {
   );
 }
 
+function layoutTree(rootName, subtree) {
+  const nodes = [];
+  const edges = [];
+  let leafIndex = 0;
+  const HGAP = 64;
+  const VGAP = 64;
+  const PADDING = 28;
+
+  const walk = (name, tree, depth, parentIdx) => {
+    const selfIdx = nodes.length;
+    nodes.push({ name, depth, x: 0 });
+    if (parentIdx !== null) edges.push([parentIdx, selfIdx]);
+    const keys = Object.keys(tree);
+    if (keys.length === 0) {
+      nodes[selfIdx].x = leafIndex * HGAP;
+      leafIndex++;
+    } else {
+      const childIdxs = keys.map((k) => walk(k, tree[k], depth + 1, selfIdx));
+      const xs = childIdxs.map((i) => nodes[i].x);
+      nodes[selfIdx].x = (Math.min(...xs) + Math.max(...xs)) / 2;
+    }
+    return selfIdx;
+  };
+
+  walk(rootName, subtree, 0, null);
+
+  const xs = nodes.map((n) => n.x);
+  const offsetX = PADDING - Math.min(...xs);
+  const laid = nodes.map((n) => ({
+    name: n.name,
+    x: n.x + offsetX,
+    y: n.depth * VGAP + PADDING,
+  }));
+  const maxX = Math.max(...laid.map((n) => n.x));
+  const maxY = Math.max(...laid.map((n) => n.y));
+  return {
+    nodes: laid,
+    edges,
+    width: maxX + PADDING,
+    height: maxY + PADDING,
+  };
+}
+
+function GraphView({ rootName, subtree }) {
+  const { nodes, edges, width, height } = useMemo(
+    () => layoutTree(rootName, subtree),
+    [rootName, subtree],
+  );
+  const R = 18;
+  return (
+    <div className="graph-wrap">
+      <svg
+        className="graph"
+        viewBox={`0 0 ${width} ${height}`}
+        preserveAspectRatio="xMidYMid meet"
+        role="img"
+        aria-label={`Hierarchy graph rooted at ${rootName}`}
+      >
+        <defs>
+          <linearGradient id={`nd-${rootName}`} x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor="#2e86ff" />
+            <stop offset="100%" stopColor="#0b4bb4" />
+          </linearGradient>
+          <filter id={`glow-${rootName}`} x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="2" result="b" />
+            <feMerge>
+              <feMergeNode in="b" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+        </defs>
+        {edges.map(([from, to], i) => (
+          <line
+            key={i}
+            x1={nodes[from].x}
+            y1={nodes[from].y}
+            x2={nodes[to].x}
+            y2={nodes[to].y}
+            stroke="rgba(21, 115, 254, 0.35)"
+            strokeWidth="1.6"
+            strokeLinecap="round"
+          />
+        ))}
+        {nodes.map((n, i) => (
+          <g key={i} filter={`url(#glow-${rootName})`}>
+            <circle
+              cx={n.x}
+              cy={n.y}
+              r={R}
+              fill={`url(#nd-${rootName})`}
+              stroke="rgba(255,255,255,0.7)"
+              strokeWidth="1.5"
+            />
+            <text
+              x={n.x}
+              y={n.y}
+              textAnchor="middle"
+              dominantBaseline="central"
+              fontSize="14"
+              fontFamily="ui-monospace, SFMono-Regular, Menlo, Monaco, monospace"
+              fontWeight="700"
+              fill="#ffffff"
+            >
+              {n.name}
+            </text>
+          </g>
+        ))}
+      </svg>
+    </div>
+  );
+}
+
+function CycleGraphView({ root }) {
+  const size = 120;
+  const cx = size / 2;
+  const cy = size / 2;
+  const r = 34;
+  return (
+    <div className="graph-wrap cycle">
+      <svg
+        className="graph"
+        viewBox={`0 0 ${size} ${size}`}
+        preserveAspectRatio="xMidYMid meet"
+        role="img"
+        aria-label={`Cyclic component with root ${root}`}
+      >
+        <defs>
+          <marker id="cycle-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="#b16a00" />
+          </marker>
+        </defs>
+        <circle cx={cx} cy={cy} r={r} fill="none" stroke="rgba(245, 165, 36, 0.55)" strokeWidth="1.6" strokeDasharray="4 4" />
+        <path
+          d={`M ${cx + r} ${cy} A ${r} ${r} 0 1 1 ${cx + r - 0.1} ${cy - 0.1}`}
+          fill="none"
+          stroke="rgba(245, 165, 36, 0.85)"
+          strokeWidth="1.8"
+          markerEnd="url(#cycle-arrow)"
+        />
+        <circle cx={cx} cy={cy} r={18} fill="#b16a00" stroke="rgba(255,255,255,0.7)" strokeWidth="1.5" />
+        <text x={cx} y={cy} textAnchor="middle" dominantBaseline="central" fontSize="14" fontFamily="ui-monospace, monospace" fontWeight="700" fill="#fff">
+          {root}
+        </text>
+      </svg>
+    </div>
+  );
+}
+
 function HierarchyCard({ h }) {
+  const [view, setView] = useState('graph');
+
   if (h.has_cycle) {
     return (
       <div className="hierarchy cyclic">
@@ -118,6 +360,7 @@ function HierarchyCard({ h }) {
           </span>
           <span className="badge badge-cycle">cycle detected</span>
         </div>
+        <CycleGraphView root={h.root} />
         <div className="cycle-note">
           This group forms a cycle — no valid root-to-leaf tree can be produced.
         </div>
@@ -132,11 +375,37 @@ function HierarchyCard({ h }) {
         <span className="root-label">
           Root <strong>{h.root}</strong>
         </span>
-        <span className="badge badge-depth">depth {h.depth}</span>
+        <div className="hier-header-right">
+          <div className="view-toggle" role="tablist" aria-label="Switch hierarchy view">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={view === 'graph'}
+              className={view === 'graph' ? 'active' : ''}
+              onClick={() => setView('graph')}
+            >
+              Graph
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={view === 'tree'}
+              className={view === 'tree' ? 'active' : ''}
+              onClick={() => setView('tree')}
+            >
+              Tree
+            </button>
+          </div>
+          <span className="badge badge-depth">depth {h.depth}</span>
+        </div>
       </div>
-      <ul className="tree">
-        {rootKey && <TreeNode name={rootKey} subtree={h.tree[rootKey]} />}
-      </ul>
+      {view === 'graph' ? (
+        <GraphView rootName={rootKey} subtree={h.tree[rootKey]} />
+      ) : (
+        <ul className="tree">
+          {rootKey && <TreeNode name={rootKey} subtree={h.tree[rootKey]} />}
+        </ul>
+      )}
     </div>
   );
 }
@@ -240,6 +509,7 @@ export default function Page() {
 
   return (
     <>
+      <BgGraph />
       <span className="bg-orb o1" aria-hidden="true" />
       <span className="bg-orb o2" aria-hidden="true" />
       <span className="bg-orb o3" aria-hidden="true" />

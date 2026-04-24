@@ -67,12 +67,23 @@ body {
   overflow-x: hidden;
 }
 
+/* Animated node-graph canvas (bleed through glass) */
+.bg-graph {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.5;
+}
+
 /* Background gradient orbs (bleed through glass) */
 .bg-orb {
   position: fixed;
   border-radius: 50%;
   filter: blur(90px);
-  opacity: 0.55;
+  opacity: 0.45;
   pointer-events: none;
   z-index: 0;
   will-change: transform;
@@ -655,6 +666,71 @@ textarea:focus {
   background: rgba(245, 165, 36, 0.15);
   color: var(--warning);
   border: 1px solid rgba(245, 165, 36, 0.4);
+}
+
+.hier-header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.view-toggle {
+  display: inline-flex;
+  padding: 3px;
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.view-toggle button {
+  font-family: inherit;
+  background: transparent;
+  border: 0;
+  color: var(--ink-muted);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.view-toggle button:hover {
+  color: var(--ink);
+}
+
+.view-toggle button.active {
+  background: linear-gradient(135deg, var(--brand-blue) 0%, var(--brand-blue-700) 100%);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(21, 115, 254, 0.32);
+}
+
+.graph-wrap {
+  background: rgba(255, 255, 255, 0.4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px;
+  overflow: auto;
+  max-height: 320px;
+}
+
+.graph-wrap.cycle {
+  display: flex;
+  justify-content: center;
+  padding: 14px;
+  background: rgba(245, 165, 36, 0.06);
+  border-color: rgba(245, 165, 36, 0.25);
+}
+
+.graph {
+  display: block;
+  width: 100%;
+  height: auto;
+  min-width: 220px;
+  max-width: 100%;
 }
 
 .cycle-note {

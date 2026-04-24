@@ -232,56 +232,26 @@ next.config.mjs     `output: 'standalone'` for small runtime image
 
 ## Deployment
 
-**Stack:** Hostinger VPS · Docker · nginx reverse proxy (shared across multiple apps) · Cloudflare proxy with Cloudflare Origin CA wildcard cert for `*.ushamroy.com`.
+**Stack:** VPS · Docker · nginx reverse proxy · Cloudflare proxy with Cloudflare Origin CA wildcard cert for `*.ushamroy.com`.
 
 ### Build & run
 
 ```bash
-# On the VPS, inside /root/bfhl-app
 docker build -t bfhl-app:latest .
 docker network create bfhl_default 2>/dev/null || true
 docker run -d --name bfhl-app --restart unless-stopped \
   --network bfhl_default \
-  -e USER_FULL_NAME=ushamroy \
-  -e USER_DOB_DDMMYYYY=04082005 \
-  -e USER_EMAIL=ur3349@srmist.edu.in \
-  -e USER_ROLL_NUMBER=RA2311003011574 \
+  --env-file .env.local \
   bfhl-app:latest
-docker network connect bfhl_default shared-nginx 2>/dev/null || true
 ```
 
-### nginx vhost (appended to `/root/shared-nginx/nginx.conf`)
-
-```nginx
-server {
-    listen 443 ssl;
-    listen [::]:443 ssl;
-    http2 on;
-    server_name bfhl-task.ushamroy.com;
-    ssl_certificate     /etc/ssl/certs/ushamroy.com.crt;
-    ssl_certificate_key /etc/ssl/private/ushamroy.com.key;
-    ssl_protocols TLSv1.2 TLSv1.3;
-    add_header Strict-Transport-Security "max-age=31536000" always;
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-
-    location / {
-        proxy_pass http://bfhl-app:3000;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto https;
-        proxy_read_timeout 120s;
-    }
-}
-```
+Attach the reverse-proxy container to `bfhl_default` and point a server block at `http://bfhl-app:3000`. Use the `*.ushamroy.com` Cloudflare Origin cert on the TLS terminator of your choice.
 
 ### Cloudflare DNS
 
 | Type | Name | Content | Proxy |
 |---|---|---|---|
-| A | `bfhl` | `187.127.150.202` | Proxied |
+| A | `bfhl-task` | your-vps-ip | Proxied |
 
 ## Local Development
 
